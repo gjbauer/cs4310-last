@@ -2,10 +2,10 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
+#include <unistd.h>
 #include <fcntl.h>
-#include <stdbool.h>
+
+/* This code was written by DeepSeek. */
 
 int
 main(int argc, char* argv[])
@@ -18,26 +18,37 @@ main(int argc, char* argv[])
         return 1;
     }
 
-    // Open
-    
-    int fd = open(argv[1], O_RDWR);
-    
-    struct stat fs;
-    
-    uint64_t sum = 0;
-    
-    int pos = 0;
-    
-    stat(argv[1], &fs);
-        uint64_t *mmap_base = (uint64_t*)mmap(0, fs.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        
-        while (true) {
-        	if (pos == fs.st_size) break;
-        	sum += *mmap_base;
-        	*mmap_base++, pos++;
-        	printf("Partial sum: %lu\n", sum);
-    	}
+    // Open the file using open(2)
+    int fd = open(argv[1], O_RDONLY);
+    if (fd == -1) {
+        perror("open failed");
+        return 1;
+    }
 
+    uint64_t sum = 0;
+    uint32_t num;
+    ssize_t bytes_read;
+
+    // Read 32-bit unsigned integers from the file until EOF
+    while ((bytes_read = read(fd, &num, sizeof(uint32_t))) > 0) {
+        if (bytes_read != sizeof(uint32_t)) {
+            fprintf(stderr, "Error: incomplete read (expected %zu bytes, got %zd)\n", 
+                    sizeof(uint32_t), bytes_read);
+            close(fd);
+            return 1;
+        }
+        
+        sum += num;
+        printf("Partial sum: %lu\n", sum);
+    }
+
+    if (bytes_read == -1) {
+        perror("Error reading from file");
+        close(fd);
+        return 1;
+    }
+
+    close(fd);
     printf("Final sum: %lu\n", sum);
     return 0;
 }
